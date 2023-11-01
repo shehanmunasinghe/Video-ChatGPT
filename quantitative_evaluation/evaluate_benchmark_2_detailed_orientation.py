@@ -11,13 +11,15 @@ def parse_args():
     parser.add_argument("--pred_path", required=True, help="The path to file containing prediction.")
     parser.add_argument("--output_dir", required=True, help="The path to save annotation json files.")
     parser.add_argument("--output_json", required=True, help="The path to save annotation final combined json file.")
+    parser.add_argument("--api_base", default="https://api.openai.com/v1", help="OpenAI API URL")
+    parser.add_argument('--model_name', default="gpt-3.5-turbo", help="Name of the model to use. e.g.: gpt-3.5-turbo or vicuna-13b-v1.5")
     parser.add_argument("--api_key", required=True, help="OpenAI API key.")
     parser.add_argument("--num_tasks", required=True, type=int, help="Number of splits.")
     args = parser.parse_args()
     return args
 
 
-def annotate(prediction_set, caption_files, output_dir):
+def annotate(model_name, prediction_set, caption_files, output_dir):
     """
     Evaluates question and answer pairs using GPT-3 and
     returns a score for detailed orientation.
@@ -31,7 +33,7 @@ def annotate(prediction_set, caption_files, output_dir):
         try:
             # Compute the detailed-orientation score
             completion = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
+                model=model_name,
                 messages=[
                     {
                         "role": "system",
@@ -119,6 +121,7 @@ def main():
         prediction_set[id] = qa_set
 
     # Set the OpenAI API key.
+    openai.api_base = args.api_base
     openai.api_key = args.api_key
     num_tasks = args.num_tasks
 
@@ -142,7 +145,7 @@ def main():
             # Split tasks into parts.
             part_len = len(incomplete_files) // num_tasks
             all_parts = [incomplete_files[i:i + part_len] for i in range(0, len(incomplete_files), part_len)]
-            task_args = [(prediction_set, part, args.output_dir) for part in all_parts]
+            task_args = [(args.model_name, prediction_set, part, args.output_dir) for part in all_parts]
 
             # Use a pool of workers to process the files in parallel.
             with Pool() as pool:
