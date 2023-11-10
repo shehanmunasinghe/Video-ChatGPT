@@ -4,6 +4,8 @@ import torch.nn as nn
 from torch.nn import CrossEntropyLoss
 from transformers import AutoConfig, AutoModelForCausalLM, LlamaConfig, LlamaModel, LlamaForCausalLM
 from transformers.modeling_outputs import BaseModelOutputWithPast, CausalLMOutputWithPast
+from video_chatgpt.model.multimodal_projector.builder import build_vision_projector # rusiru
+from transformers import CLIPVisionConfig
 
 DEFAULT_VIDEO_TOKEN = "<video>"
 DEFAULT_VIDEO_PATCH_TOKEN = "<vid_patch>"
@@ -12,10 +14,16 @@ DEFAULT_VID_END_TOKEN = "<vid_end>"
 
 
 class VisionConfig:
-    def __init__(self):
-        self.frame_size = 224
-        self.patch_size = 14
-        self.hidden_size = 1024
+    def __init__(self, 
+                 frame_size=224,
+                 patch_size=14,
+                 hidden_size=1024,
+                 ):
+        # from CLIP config
+        self.frame_size = frame_size
+        self.patch_size = patch_size
+        self.hidden_size = hidden_size
+        # video_chatgpt config
         self.use_vid_start_end = None
         self.vid_start_token = None
         self.vid_end_token = None
@@ -31,12 +39,20 @@ class VideoChatGPTLlamaModel(LlamaModel):
 
     def __init__(self, config: LlamaConfig, mm_vision_tower=None, mm_hidden_size=None):  # TODO: Remove unused params
         super(VideoChatGPTLlamaModel, self).__init__(config)
-
+        
         if hasattr(config, "mm_vision_tower"):
-            self.vision_config = VisionConfig()
+            clip_cfg = CLIPVisionConfig.from_pretrained(config.mm_vision_tower)
+            self.vision_config = VisionConfig(
+                frame_size=clip_cfg.image_size,
+                patch_size = clip_cfg.patch_size,
+                hidden_size=clip_cfg.hidden_size
+            )
 
         if hasattr(config, "use_mm_proj"):
-            self.mm_projector = nn.Linear(config.mm_hidden_size, config.hidden_size)
+            if self.vision_config.frame_size==224: # using LLaVA-v1.1-Lightning
+                self.mm_projector = nn.Linear(config.mm_hidden_size, config.hidden_size)
+            else: # using LLaVA-v1.5
+                self.mm_projector = build_vision_projector(config)
 
     def initialize_vision_modules(self, pretrain_mm_mlp_adapter=None, tune_mm_mlp_adapter=False):
         vision_config = self.vision_config
@@ -46,14 +62,20 @@ class VideoChatGPTLlamaModel(LlamaModel):
         self.config.mm_hidden_size = vision_config.hidden_size
 
         if not hasattr(self, 'mm_projector'):
-            self.mm_projector = nn.Linear(vision_config.hidden_size, self.config.hidden_size)
+            if self.vision_config.frame_size==224: # using LLaVA-v1.1-Lightning
+                self.mm_projector = nn.Linear(vision_config.hidden_size, self.config.hidden_size)
+            else: # using LLaVA-v1.5
+                self.mm_projector = build_vision_projector(vision_config) # rusiru
 
         if pretrain_mm_mlp_adapter is not None:
             mm_projector_weights = torch.load(pretrain_mm_mlp_adapter, map_location='cpu')
-            self.mm_projector.load_state_dict({k.split('.')[-1]: v for k, v in mm_projector_weights.items()})
+            def get_w(weights, keyword): # rusiru
+                return {k.split(keyword + '.')[1]: v for k, v in weights.items() if keyword in k}
+
+            self.mm_projector.load_state_dict(get_w(mm_projector_weights, 'mm_projector')) # rusiru
 
         return dict(
-            video_token_len=num_patches,
+            num_patches=num_patches,
             vision_config=vision_config
         )
 

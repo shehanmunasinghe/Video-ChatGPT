@@ -154,10 +154,9 @@ def _add_speaker_and_signal(header, source, get_conversation=True):
 def preprocess_multimodal(
         sources: Sequence[str],
         multimodal_cfg: dict,
-        cur_token_len: int,
 ) -> Dict:
     is_multimodal = multimodal_cfg['is_multimodal']
-    video_token_len = cur_token_len
+    video_token_len = multimodal_cfg['video_token_len']
     if not is_multimodal:
         return sources
 
@@ -405,10 +404,9 @@ class LazySupervisedDataset(Dataset):
             with open(f"{video_folder}/{video_file}", "rb") as f:
                 features = pickle.load(f)
 
-            cur_token_len = 356  # 100 temporal + 256 spatial, TODO: Hard Coding is not good
             sources = preprocess_multimodal(
                 copy.deepcopy([e["conversations"] for e in sources]),
-                self.multimodal_cfg, cur_token_len)
+                self.multimodal_cfg)
 
         data_dict = preprocess(
             sources,
@@ -457,16 +455,16 @@ class DataCollatorForSupervisedDataset(object):
 
 
 def make_supervised_data_module(tokenizer: transformers.PreTrainedTokenizer,
-                                data_args) -> Dict:
+                                data_args, video_token_len) -> Dict:
     """Make dataset and collator for supervised fine-tuning."""
     dataset_cls = (LazySupervisedDataset
                    if data_args.lazy_preprocess else SupervisedDataset)
     train_dataset = dataset_cls(tokenizer=tokenizer,
                                 data_path=data_args.data_path,
                                 multimodal_cfg=dict(
+                                    video_token_len=video_token_len,
                                     is_multimodal=data_args.is_multimodal,
                                     sep_video_conv_front=data_args.sep_video_conv_front,
-                                    video_token_len=data_args.video_token_len,
                                     video_folder=data_args.video_folder,
                                     frame_aspect_ratio=data_args.frame_aspect_ratio,
                                     use_vid_start_end=getattr(data_args, 'mm_use_vid_start_end', False)))
@@ -506,7 +504,6 @@ def train():
     )
     vision_config = model_vision_dict['vision_config']
 
-    data_args.video_token_len = model_vision_dict['video_token_len']
     data_args.is_multimodal = True
 
     model.config.tune_mm_mlp_adapter = training_args.tune_mm_mlp_adapter = model_args.tune_mm_mlp_adapter
@@ -551,7 +548,8 @@ def train():
 
             FSDP.__init__ = patch_FSDP_use_orig_params(FSDP.__init__)
 
-    data_module = make_supervised_data_module(tokenizer=tokenizer, data_args=data_args)
+    video_token_len = model_vision_dict["num_patches"]+100
+    data_module = make_supervised_data_module(tokenizer=tokenizer, data_args=data_args, video_token_len=video_token_len)
     training_args.report_to = []
     # training_args.max_steps = 10
     trainer = VideoChatGPTTrainer(model=model, tokenizer=tokenizer, args=training_args, **data_module)

@@ -34,6 +34,8 @@ def run_inference(args):
     # Initialize the model
     model, vision_tower, tokenizer, image_processor, video_token_len = initialize_model(args.model_name,
                                                                                         args.projection_path)
+    frame_size = (image_processor.crop_size['height'], image_processor.crop_size['width'])
+    
     # Load both ground truth file containing questions and answers
     with open(args.gt_file_question) as file:
         gt_questions = json.load(file)
@@ -69,7 +71,7 @@ def run_inference(args):
 
         # Check if the video exists
         if os.path.exists(video_path):
-            video_frames = load_video(video_path)
+            video_frames = load_video(video_path, shape=frame_size)
 
         try:
             # Run inference on the video and add the output to the list

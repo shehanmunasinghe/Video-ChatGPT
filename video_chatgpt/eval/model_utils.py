@@ -9,7 +9,7 @@ from video_chatgpt.constants import *
 import torch
 
 
-def load_video(vis_path, n_clips=1, num_frm=100):
+def load_video(vis_path, n_clips=1, num_frm=100, shape=(224,224)):
     """
     Load video frames from a video file.
 
@@ -36,7 +36,7 @@ def load_video(vis_path, n_clips=1, num_frm=100):
     # Extract frames as numpy array
     img_array = vr.get_batch(frame_idx).asnumpy()
     # Set target image height and width
-    target_h, target_w = 224, 224
+    target_h, target_w = shape 
     # If image shape is not as target, resize it
     if img_array.shape[-3] != target_h or img_array.shape[-2] != target_w:
         img_array = torch.from_numpy(img_array).permute(0, 3, 1, 2).float()
@@ -129,11 +129,9 @@ def initialize_model(model_name, projection_path=None):
     # Set model to evaluation mode and move to GPU
     model = model.eval()
     model = model.cuda()
-
-    vision_tower_name = "openai/clip-vit-large-patch14"
-
+    
     # Load vision tower and move to GPU
-    vision_tower = CLIPVisionModel.from_pretrained(vision_tower_name, torch_dtype=torch.float16,
+    vision_tower = CLIPVisionModel.from_pretrained(model.config.mm_vision_tower, torch_dtype=torch.float16,
                                                    low_cpu_mem_usage=True).cuda()
     vision_tower = vision_tower.eval()
 
@@ -146,6 +144,7 @@ def initialize_model(model_name, projection_path=None):
             [DEFAULT_VID_START_TOKEN, DEFAULT_VID_END_TOKEN])
 
     # Set video token length
-    video_token_len = 356
+    num_patches_per_frame = (model.get_model().vision_config.frame_size // model.get_model().vision_config.patch_size) ** 2
+    video_token_len = num_patches_per_frame + 100
 
     return model, vision_tower, tokenizer, image_processor, video_token_len
