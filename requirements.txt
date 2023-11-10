@@ -13,3 +13,5 @@ protobuf==4.23.2
 accelerate==0.20.3
 tokenizers>=0.13.3
 pydantic==1.10.7
+git+https://github.com/m-bain/whisperx.git
+git+https://github.com/shehanmunasinghe/whisper-at.git@patch-1#subdirectory=package/whisper-at

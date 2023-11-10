@@ -10,6 +10,7 @@ python -m video_chatgpt.single_video_inference \
 
 from video_chatgpt.video_conversation import conv_templates, SeparatorStyle
 from video_chatgpt.model.utils import KeywordsStoppingCriteria
+from video_chatgpt.audio_transcript.transcribe import Transcriber
 import torch
 
 #add new packages as below
@@ -25,6 +26,8 @@ DEFAULT_VIDEO_TOKEN = "<video>"
 DEFAULT_VIDEO_PATCH_TOKEN = "<vid_patch>"
 DEFAULT_VID_START_TOKEN = "<vid_start>"
 DEFAULT_VID_END_TOKEN = "<vid_end>"
+DEFAULT_TRANSCRIPT_START = "The noisy audio transcript of this video is:"
+# DEFAULT_TRANSCRIPT_START="The transcript of the video provided by an automatic speech recognition model is as follows:"
 
 
 
@@ -62,7 +65,7 @@ def get_spatio_temporal_features_torch(features):
     return concat_tokens
 
 
-def video_chatgpt_infer(video_frames, question, conv_mode, model, vision_tower, tokenizer, image_processor, video_token_len):
+def video_chatgpt_infer(video_frames, question, conv_mode, model, vision_tower, tokenizer, image_processor, video_token_len, transcript=None):
     """
     Run inference using the Video-ChatGPT model.
 
@@ -86,6 +89,10 @@ def video_chatgpt_infer(video_frames, question, conv_mode, model, vision_tower, 
         qs = question + '\n' + DEFAULT_VID_START_TOKEN + DEFAULT_VIDEO_PATCH_TOKEN * video_token_len + DEFAULT_VID_END_TOKEN
     else:
         qs = question + '\n' + DEFAULT_VIDEO_PATCH_TOKEN * video_token_len
+
+    # Append transcript text to the question
+    if transcript:
+        qs = f'{question}\n{DEFAULT_TRANSCRIPT_START}\n\"{transcript}\"'
 
     # Prepare conversation prompt
     conv = conv_templates[conv_mode].copy()
@@ -145,6 +152,7 @@ def parse_args():
     parser.add_argument("--model-name", type=str, required=True)
     parser.add_argument("--projection_path", type=str, required=True)
     parser.add_argument("--video_path", type=str, required=True)
+    parser.add_argument("--use_asr", action='store_true', help='Whether to use audio transcripts or not')
     parser.add_argument("--conv_mode", type=str, required=False, default='video-chatgpt_v1')
 
     args = parser.parse_args()
@@ -167,11 +175,17 @@ if __name__ == "__main__":
     
     question = input("Enter a question to check from the video:")
     conv_mode = args.conv_mode
+    
+    if args.use_asr:
+        transcript_model = Transcriber()
+        transcript_text = transcript_model.transcribe_video(video_path=video_path)
+    else:
+        transcript_text=None
 
     try:
         # Run inference on the video and add the output to the list
         output = video_chatgpt_infer(video_frames, question, conv_mode, model, vision_tower,
-                                            tokenizer, image_processor, video_token_len)
+                                            tokenizer, image_processor, video_token_len, transcript_text)
         print("\n\n", output)
         
     except Exception as e:

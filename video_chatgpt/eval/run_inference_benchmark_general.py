@@ -4,7 +4,7 @@ import json
 from tqdm import tqdm
 from video_chatgpt.eval.model_utils import initialize_model, load_video
 from video_chatgpt.inference import video_chatgpt_infer
-
+from video_chatgpt.audio_transcript.transcribe import Transcriber
 
 def parse_args():
     """
@@ -20,6 +20,7 @@ def parse_args():
     parser.add_argument("--model-name", type=str, required=True)
     parser.add_argument("--conv-mode", type=str, required=False, default='video-chatgpt_v1')
     parser.add_argument("--projection_path", type=str, required=True)
+    parser.add_argument("--use_asr", action='store_true', help='Whether to use audio transcripts or not')
 
     return parser.parse_args()
 
@@ -35,6 +36,10 @@ def run_inference(args):
     model, vision_tower, tokenizer, image_processor, video_token_len = initialize_model(args.model_name,
                                                                                         args.projection_path)
     frame_size = (image_processor.crop_size['height'], image_processor.crop_size['width'])
+
+    # Transcript model
+    if args.use_asr:
+        transcript_model = Transcriber()
     
     # Load the ground truth file
     with open(args.gt_file) as file:
@@ -65,11 +70,16 @@ def run_inference(args):
         # Check if the video exists
         if video_path is not None:  # Modified this line
             video_frames = load_video(video_path, shape=frame_size)
+            
+        if args.use_asr:
+            transcript_text = transcript_model.transcribe_video(video_path=video_path)
+        else:
+            transcript_text=None
 
         try:
             # Run inference on the video and add the output to the list
             output = video_chatgpt_infer(video_frames, question, conv_mode, model, vision_tower,
-                                             tokenizer, image_processor, video_token_len)
+                                             tokenizer, image_processor, video_token_len, transcript_text)
             sample_set['pred'] = output
             output_list.append(sample_set)
         except Exception as e:

@@ -7,6 +7,8 @@ DEFAULT_VIDEO_TOKEN = "<video>"
 DEFAULT_VIDEO_PATCH_TOKEN = "<vid_patch>"
 DEFAULT_VID_START_TOKEN = "<vid_start>"
 DEFAULT_VID_END_TOKEN = "<vid_end>"
+DEFAULT_TRANSCRIPT_START = "The noisy audio transcript of this video is:"
+# DEFAULT_TRANSCRIPT_START="The transcript of the video provided by an automatic speech recognition model is as follows:"
 
 
 def get_spatio_temporal_features_torch(features):
@@ -43,7 +45,7 @@ def get_spatio_temporal_features_torch(features):
     return concat_tokens
 
 
-def video_chatgpt_infer(video_frames, question, conv_mode, model, vision_tower, tokenizer, image_processor, video_token_len):
+def video_chatgpt_infer(video_frames, question, conv_mode, model, vision_tower, tokenizer, image_processor, video_token_len, transcript=None):
     """
     Run inference using the Video-ChatGPT model.
 
@@ -67,6 +69,10 @@ def video_chatgpt_infer(video_frames, question, conv_mode, model, vision_tower, 
         qs = question + '\n' + DEFAULT_VID_START_TOKEN + DEFAULT_VIDEO_PATCH_TOKEN * video_token_len + DEFAULT_VID_END_TOKEN
     else:
         qs = question + '\n' + DEFAULT_VIDEO_PATCH_TOKEN * video_token_len
+    
+    # Append transcript text to the question
+    if transcript:
+        qs = f'{question}\n{DEFAULT_TRANSCRIPT_START}\n\"{transcript}\"'
 
     # Prepare conversation prompt
     conv = conv_templates[conv_mode].copy()
