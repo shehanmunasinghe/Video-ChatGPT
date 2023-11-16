@@ -175,9 +175,12 @@ def main():
     count = 0
     for key, result in combined_contents.items():
         count += 1
-        score_match = result[0]['score']
-        score = int(score_match)
-        score_sum += score
+        try:
+            score_match = result[0]['score']
+            score = int(score_match)
+            score_sum += score
+        except Exception as e:
+            continue
     average_score = score_sum / count
 
     print("Average score temporal understanding:", average_score)

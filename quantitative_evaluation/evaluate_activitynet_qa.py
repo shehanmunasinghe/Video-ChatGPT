@@ -176,11 +176,14 @@ def main():
     yes_count = 0
     no_count = 0
     for key, result in combined_contents.items():
-        # Computing score
         count += 1
-        score_match = result[0]['score']
-        score = int(score_match)
-        score_sum += score
+        try:
+            # Computing score
+            score_match = result[0]['score']
+            score = int(score_match)
+            score_sum += score
+        except Exception as e:
+            continue
 
         # Computing accuracy
         pred = result[0]['pred']
