@@ -29,8 +29,6 @@ DEFAULT_VID_END_TOKEN = "<vid_end>"
 DEFAULT_TRANSCRIPT_START = "The noisy audio transcript of this video is:"
 # DEFAULT_TRANSCRIPT_START="The transcript of the video provided by an automatic speech recognition model is as follows:"
 
-
-
 def get_spatio_temporal_features_torch(features):
     """
     Computes spatio-temporal features from given features.
@@ -92,7 +90,7 @@ def video_chatgpt_infer(video_frames, question, conv_mode, model, vision_tower, 
 
     # Append transcript text to the question
     if transcript:
-        qs = f'{question}\n{DEFAULT_TRANSCRIPT_START}\n\"{transcript}\"'
+        qs = f'{qs}\n{DEFAULT_TRANSCRIPT_START}\n\"{transcript}\"'
 
     # Prepare conversation prompt
     conv = conv_templates[conv_mode].copy()

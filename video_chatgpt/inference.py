@@ -72,7 +72,7 @@ def video_chatgpt_infer(video_frames, question, conv_mode, model, vision_tower, 
     
     # Append transcript text to the question
     if transcript:
-        qs = f'{question}\n{DEFAULT_TRANSCRIPT_START}\n\"{transcript}\"'
+        qs = f'{qs}\n{DEFAULT_TRANSCRIPT_START}\n\"{transcript}\"'
 
     # Prepare conversation prompt
     conv = conv_templates[conv_mode].copy()
