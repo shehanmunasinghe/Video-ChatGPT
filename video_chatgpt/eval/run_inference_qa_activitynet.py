@@ -37,6 +37,7 @@ def run_inference(args):
     model, vision_tower, tokenizer, image_processor, video_token_len = initialize_model(args.model_name,
                                                                                         args.projection_path)
     frame_size = (image_processor.crop_size['height'], image_processor.crop_size['width'])
+    conv_mode = args.conv_mode
     
     # Transcript model
     if args.use_asr:
@@ -53,7 +54,7 @@ def run_inference(args):
         os.makedirs(args.output_dir)
 
     output_list = []  # List to store the output results
-    conv_mode = args.conv_mode
+    
 
     video_formats = ['.mp4', '.avi', '.mov', '.mkv']
 
@@ -67,29 +68,38 @@ def run_inference(args):
         index += 1
 
         sample_set = {'id': id, 'question': question, 'answer': answer}
-
-        # Load the video file
-        for fmt in video_formats:  # Added this line
-            temp_path = os.path.join(args.video_dir, f"{video_name}{fmt}")
-            if os.path.exists(temp_path):
-                video_path = temp_path
-                break
-
-        # Check if the video exists
-        if os.path.exists(video_path):
-            video_frames = load_video(video_path, shape=frame_size)
-            
-        if args.use_asr:
-            transcript_text = transcript_model.transcribe_video(video_path=video_path)
-        else:
-            transcript_text=None
-
+        
+        print('video_name:', video_name)
+        
         try:
+            # Load the video file
+            for fmt in video_formats:  # Added this line
+                temp_path = os.path.join(args.video_dir, f"v_{video_name}{fmt}")
+                if os.path.exists(temp_path):
+                    print('temp_path:', temp_path)
+                    video_path = temp_path
+                    break
+
+            # Check if the video exists
+            if os.path.exists(video_path):
+                video_frames = load_video(video_path, shape=frame_size)
+                
+            if args.use_asr:
+                try:
+                    transcript_text = transcript_model.transcribe_video(video_path=video_path)
+                except:
+                    transcript_text = None
+            else:
+                transcript_text=None
+
             # Run inference on the video and add the output to the list
             output = video_chatgpt_infer(video_frames, question, conv_mode, model, vision_tower,
-                                             tokenizer, image_processor, video_token_len, transcript_text)
+                                                tokenizer, image_processor, video_token_len, transcript_text)
             sample_set['pred'] = output
             output_list.append(sample_set)
+            
+            print('question: ', question)
+            print('pred_output: ', output)
         except Exception as e:
             print(f"Error processing video file '{video_name}': {e}")
 
